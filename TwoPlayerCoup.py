@@ -235,7 +235,13 @@ class TwoSimpCoup:
         #returns the new state of the game after execuing the action
         #updates self.history and reevaluates bins on each move
         def execute(self, curr_state, bin_encoder, history):
-            pass 
+            player = curr_state.turn_counter%2
+            history.append((self,player))
+            curr_state.movestack.append(self)
+            if player == 0:
+                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins-2,curr_state.turn_counter, StateQuality.ACTION,(player+1)%0,curr_state.movestack)
+            else: 
+                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins-2,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, StateQuality.ACTION,(player+1)%0,curr_state.movestack)  
 
     class CounterStealMove:
         def __init__(self):
