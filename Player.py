@@ -1,14 +1,20 @@
 
 class BasePlayer:
-    def __init__(self, agentstate):
+    def __init__(self):
         pass 
+
+    def get_cards(self, agentstate):
+        self.cards = agentstate
 
     def make_move(self,state):
         pass 
 
+    def choose_card_to_lose(self, state):
+        pass
+
 class PolicyPlayer(BasePlayer):
-    def __init__(self, agentstate, policy):
-        super.__init__(agentstate)
+    def __init__(self, policy):
+        super.__init__()
         self.policy = policy
 
     def make_move(self,state):
@@ -16,15 +22,15 @@ class PolicyPlayer(BasePlayer):
         pass 
 
 class RandomPlayer(BasePlayer):
-    def __init__(self, agentstate):
-        super.__init__(agentstate)
+    def __init__(self):
+        super.__init__()
 
     def make_move(self,state):
         pass 
 
 class HumanPlayer(BasePlayer):
-    def __init__(self, agentstate):
-        super.__init__(agentstate)
+    def __init__(self):
+        super.__init__()
 
     def make_move(self,state):
         pass 
