@@ -3,12 +3,12 @@
 class TwoSimpCoup:
 
     #game architecture:
-    #each game state
+    #each game state 
 
     def __init__(self):
         self.cardtypes = {(0,0,0,1):"Duke", (0,0,1,0):"Assassin", (0,1,0,0):"Captain", (1,0,0,0):"Contessa"}
-        self.cardmoves = {"Duke": [], "Assassin":[], "Captain":[]}
-        self.cardcounters = {"Duke":[], "Captain":[],"Contessa":[]}
+        self.cardactions = {"Duke": [self.TaxMove()], "Assassin":[self.AssassinateMove()], "Captain":[self.StealMove()], "All":[self.IncomeMove(), self.ForeignAidMove(),self.CoupMove()]}
+        self.cardcounters = {"Duke":[self.CounterForeignAidMove()], "Captain":[self.CounterStealMove()],"Contessa":[self.CounterAssassinMove()],"All":[]}
         self.counter_playbook_size = 3
         self.main_playbook_size = 6
         self.history = [] #history of (action, player)
@@ -17,7 +17,7 @@ class TwoSimpCoup:
         """One-hot encoding of an action"""
 
     #for testing against random/optimal
-    def play(self, policy1, policy2):
+    def simulate_play(self, policy1, policy2):
         """starts a new game and returns 1 if policy1 wins and 2 if policy2 wins"""
         pass
 
@@ -37,12 +37,16 @@ class TwoSimpCoup:
         """returns the initial public state and randomly selected private states"""
         pass 
 
+    def play_human(self, policy):
+        """simulates a game between a human player and an AI player according to a given policy"""
+        pass
+
+
     
 
 
-
+    #interface for move classes
     class BaseMove:
-        #moves change the current state of the game
         def __init__(self):
             pass 
         
@@ -52,16 +56,85 @@ class TwoSimpCoup:
             pass 
 
     class TaxMove:
+        def __init__(self):
+            pass 
+        
+        #returns the new state of the game after execuing the action
+        #updates self.history and reevaluates bins on each move
+        def execute(self, curr_state):
+            pass 
 
     class AssassinateMove:
+        def __init__(self):
+            pass 
+        
+        #returns the new state of the game after execuing the action
+        #updates self.history and reevaluates bins on each move
+        def execute(self, curr_state):
+            pass 
 
     class StealMove:
+        def __init__(self):
+            pass 
+        
+        #returns the new state of the game after execuing the action
+        #updates self.history and reevaluates bins on each move
+        def execute(self, curr_state):
+            pass 
+
+    class IncomeMove:
+        def __init__(self):
+            pass 
+        
+        #returns the new state of the game after execuing the action
+        #updates self.history and reevaluates bins on each move
+        def execute(self, curr_state):
+            pass 
+
+    class ForeignAidMove:
+        def __init__(self):
+            pass 
+        
+        #returns the new state of the game after execuing the action
+        #updates self.history and reevaluates bins on each move
+        def execute(self, curr_state):
+            pass 
+
+    class CoupMove:
+        def __init__(self):
+            pass 
+        
+        #returns the new state of the game after execuing the action
+        #updates self.history and reevaluates bins on each move
+        def execute(self, curr_state):
+            pass 
     
     class CounterForeignAidMove:
+        def __init__(self):
+            pass 
+        
+        #returns the new state of the game after execuing the action
+        #updates self.history and reevaluates bins on each move
+        def execute(self, curr_state):
+            pass 
 
     class CounterStealMove:
+        def __init__(self):
+            pass 
+        
+        #returns the new state of the game after execuing the action
+        #updates self.history and reevaluates bins on each move
+        def execute(self, curr_state):
+            pass 
 
     class CounterAssassinMove:
+        def __init__(self):
+            pass 
+        
+        #returns the new state of the game after execuing the action
+        #updates self.history and reevaluates bins on each move
+        def execute(self, curr_state):
+            pass 
 
     class ChallengeMove:
         def __init__(self):
@@ -72,7 +145,7 @@ class TwoSimpCoup:
 
     
     class PublicState:
-        #contains info about history bins, number of cards on the table, number of coins, is_current_turn
+        #contains info about history bins, number of cards on the table, number of coins, certainty bins, and current turn
         def __init__(self, info):
             pass
 
@@ -91,6 +164,7 @@ class TwoSimpCoup:
             pass 
 
     class AgentState:
+        #the private state of the agent: what cards the agent has
         def __init__(self, encoded_cards):
             self.state = encoded_cards 
     
