@@ -1,4 +1,5 @@
 import random
+from Player import PolicyPlayer
 class StateQuality:
         ACTION = 0
         CHALLENGEACTION = 1
@@ -22,9 +23,13 @@ class TwoSimpCoup:
         self.associations = {1:None, 2:None, 3:None, 4:0, 5:1, 6:2, 7:3, 8:2, 9:3, 10:None, 11:None}
         self.counter_playbook_size = 3
         self.main_playbook_size = 6
+        self.combined_playbook = {1: self.IncomeMove(), 2: self.ForeignAidMove(), 3: self.CoupMove(), 4: self.TaxMove(), 5: self.AssassinateMove(), 6: self.StealMove(), 7: self.CounterForeignAidMove(), 8: self.CounterStealMove(), 9: self.CounterAssassinMove(), 10: self.ChallengeMove(self.associations), 11: self.AllowMove()}
         self.num_cards = 4
         self.card_dupes = 3
-        self.history = [] #history of (action, player)
+        self.history = [] #history of (action, player) or (-1, player, card index) for losing cards
+        self.p1 = None 
+        self.p2 = None
+        self.curr_state = None
 
     def assign_players(self, p1obj, p2obj):
         self.p1 = p1obj 
@@ -32,7 +37,7 @@ class TwoSimpCoup:
 
     def encode_action(self,  action):
         """One-hot encoding of an action"""
-        return (0 if i != action.index else 1 for i in range(self.counter_playbook_size + self.main_playbook_size + 1))
+        return (0 if i != action.index-1 else 1 for i in range(len(self.combined_playbook)))
 
     def encode_card(self, card_index):
         return (0 if i != card_index else 1 for i in range(self.num_cards))
@@ -43,45 +48,38 @@ class TwoSimpCoup:
         p1_bins = [0 for i in range(self.num_cards)]
         p2_bins = [0 for i in range (self.num_cards)]
         for action_player in self.history:
-            if self.associations[action_player[0].index] != None:
+            if len(action_player) > 2:
+                #check card index and subtract 5
                 if action_player[1] == 0:
-                    p1_bins[action_player[0].index] += 1
+                    p1_bins[action_player[2]] -= 5
                 else:
-                    p2_bins[action_player[0].index] += 1
+                    p2_bins[action_player[2]] -= 5
+            elif self.associations[action_player[0].index] != None:
+                if action_player[1] == 0:
+                    p1_bins[self.associations[action_player[0].index]] += 1
+                else:
+                    p2_bins[self.associations[action_player[0].index]] += 1
         
         #calculate certainty: 0 for unlikely, 0.5 for unclear, 1 for likely
         p1_total = sum(p1_bins)
         p2_total = sum(p2_bins)
         for i in range(self.num_cards):
-            if p1_bins[i] > p1_total//3:
+            if p1_bins[i] > p1_total//2:
                 p1_bins[i] = 1
-            elif p1_bins[i] < p1_total//6:
+            elif p1_bins[i] < p1_total//5:
                 p1_bins[i] = 0
             else:
                 p1_bins[i] = 0.5 
 
-            if p2_bins[i] > p2_total//3:
+            if p2_bins[i] > p2_total//2:
                 p2_bins[i] = 1
-            elif p2_bins[i] < p1_total//6:
+            elif p2_bins[i] < p1_total//5:
                 p2_bins[i] = 0
             else:
                 p2_bins[i] = 0.5 
         return (tuple(p1_bins), tuple(p2_bins))
 
         #return (p1(certainty bins),p2(certainty))
-
-    #for testing against random/optimal
-    def simulate_play(self, policy1, policy2):
-        """starts a new game and returns 1 if policy1 wins and 2 if policy2 wins"""
-        pass
-
-    def simple_opponent(self, state):
-        """returns the move as an integer made by an opponent after simulating perfect-information optimal play """
-        #config new set of possible opponent moves and possible curr moves based on bins
-        #run minimax on new, very limited set of actions/states
-            # no bins, just num cards and num coins in state: much smaller space
-
-        pass
 
     def valid_moves(self, state):
         """"""
@@ -94,6 +92,8 @@ class TwoSimpCoup:
         
         if state.state_class == StateQuality.ACTION:
             moves.extend([1,2,4,6])
+            if playercoins >= 10:
+                return [3]
             if playercoins >= 3:
                 moves.append(5)
             if playercoins >= 7:
@@ -136,18 +136,67 @@ class TwoSimpCoup:
         p2deck.append(deck.pop(random.randrange(len(deck))))
         self.p1.get_cards(p1deck)
         self.p2.get_cards(p2deck)
-        ret_vals = [PublicState([],2,2,2,2,0,StateQuality.ACTION, 0, [])] #public state, p1state, p2state
+        start_state = PublicState([],2,2,2,2,0,StateQuality.ACTION, 0, [])
+        self.curr_state = start_state
+        ret_vals = [start_state] #public state, p1state, p2state
         ret_vals.append([self.encode_card(p1deck[0]),self.encode_card(p1deck[1])])
         ret_vals.append([self.encode_card(p2deck[0]),self.encode_card(p2deck[1])])
         return ret_vals
         
 
-    def play_human(self, policy):
-        """simulates a game between a human player and an AI player according to a given policy"""
-        pass
+    def setup(self, p1obj, p2obj):
+        """Takes care of assigning players and starting new game"""
+        self.assign_players(p1obj, p2obj)
+        start_state_and_encoded_hands = self.new_game()
+        self.combined_playbook[10].assign_players(self.p1,self.p2)
 
+        return start_state_and_encoded_hands
+
+    def play(self):
+        if self.p1 == None or self.p2 == None:
+            print("Agents not specified. Aborting")
+            return 
+        while self.curr_state.is_terminal() == -1:
+            if self.curr_state.state_class == StateQuality.LOSINGCARD:
+                if self.curr_state.curr_player == 0:
+                    card_lost = self.p1.choose_card_to_lose(self.curr_state)
+                    self.history.append((-1, 0, card_lost))
+                    self.curr_state = PublicState(self.encode_bins(), self.curr_state.p1cards-1,self.curr_state.p1coins, self.curr_state.p2cards, self.curr_state.p2coins,self.curr_state.turn_counter+1,StateQuality.ACTION, 1, []) 
+
+                else:
+                    card_lost = self.p2.choose_card_to_lose(self.curr_state)
+                    self.history.append((-1, 1, card_lost))
+                    self.curr_state = PublicState(self.encode_bins(), self.curr_state.p1cards,self.curr_state.p1coins, self.curr_state.p2cards-1, self.curr_state.p2coins,self.curr_state.turn_counter+1,StateQuality.ACTION, 0, []) 
+
+            else:
+                if self.curr_state.curr_player == 0:
+                    move = self.p1.make_move(self.curr_state)
+                    if move == None:
+                        self.curr_state = PublicState(self.curr_state.bins, self.curr_state.p1cards, self.curr_state.p1coins, self.curr_state.p2cards, self.curr_state.p2coins, self.curr_state.turn_counter, self.curr_state.next_quality(),self.curr_state.curr_player,self.curr_state.movestack)
+                    else:
+                        self.curr_state = self.combined_playbook[move].execute(self.curr_state,self.encode_bins,self.history)
+                else:
+                    move = self.p2.make_move(self.curr_state)
+                    if move == None:
+                        self.curr_state = PublicState(self.curr_state.bins, self.curr_state.p1cards, self.curr_state.p1coins, self.curr_state.p2cards, self.curr_state.p2coins, self.curr_state.turn_counter, self.curr_state.next_quality(),self.curr_state.curr_player,self.curr_state.movestack)
+                    else:
+                        self.curr_state = self.combined_playbook[move].execute(self.curr_state,self.encode_bins,self.history)
+
+            
+        return self.curr_state.is_terminal() 
+
+    def simulate(self, policy1, policy2):
+        old_players = [self.p1, self.p2]
+        newp1 = PolicyPlayer(self,0,policy1)
+        newp2 = PolicyPlayer(self,1,policy2)
+        self.setup(newp1,newp2)
+        result = self.play()
+        self.setup(old_players[0],old_players[1])
+        return result
 
     
+        
+
 
 
     #interface for move classes
@@ -170,9 +219,9 @@ class TwoSimpCoup:
             player = curr_state.curr_player
             history.append((self,player))
             if player == 0:
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins+3,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, curr_state.next_quality(),(player+1)%0,[self])
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins+3,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, curr_state.next_quality(),(player+1)%2,[self])
             else:
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins+3,curr_state.turn_counter, curr_state.next_quality(),(player+1)%0,[self])
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins+3,curr_state.turn_counter, curr_state.next_quality(),(player+1)%2,[self])
 
     class AssassinateMove:
         def __init__(self):
@@ -185,9 +234,9 @@ class TwoSimpCoup:
             history.append((self,player))
             #delay card loss after other stages; only calculate coin loss
             if player== 0:
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins-3,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, curr_state.next_quality(), (player+1)%0,[self])
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins-3,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, curr_state.next_quality(), (player+1)%2,[self])
             else:
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins-3,curr_state.turn_counter, curr_state.next_quality(), (player+1)%0,[self])   
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins-3,curr_state.turn_counter, curr_state.next_quality(), (player+1)%2,[self])   
 
     class StealMove:
         def __init__(self):
@@ -197,16 +246,16 @@ class TwoSimpCoup:
         #updates self.history and reevaluates bins on each move
         def execute(self, curr_state, bin_encoder, history):
             player = curr_state.curr_player
-            history.append((self.index,player))
+            history.append((self,player))
             stolen_amount = 2
             if player == 0:
-                if curr_state.p2_coins < 2:
-                    stolen_amount = curr_state.p2_coins
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins+stolen_amount,curr_state.p2cards,curr_state.p2coins-stolen_amount,curr_state.turn_counter, curr_state.next_quality(),(player+1)%2,[self])
+                if curr_state.p2coins < 2:
+                    stolen_amount = curr_state.p2coins
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins+stolen_amount,curr_state.p2cards,curr_state.p2coins-stolen_amount,curr_state.turn_counter, curr_state.next_quality(),(player+1)%2,[self])
             else:
-                if curr_state.p1_coins < 2:
-                    stolen_amount = curr_state.p1_coins
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins-stolen_amount,curr_state.p2cards,curr_state.p2coins+stolen_amount,curr_state.turn_counter, curr_state.next_quality(),(player+1)%2,[self]) 
+                if curr_state.p1coins < 2:
+                    stolen_amount = curr_state.p1coins
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins-stolen_amount,curr_state.p2cards,curr_state.p2coins+stolen_amount,curr_state.turn_counter, curr_state.next_quality(),(player+1)%2,[self]) 
 
     class IncomeMove:
         def __init__(self):
@@ -218,9 +267,9 @@ class TwoSimpCoup:
             player = curr_state.curr_player
             history.append((self,player))
             if player == 0:
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins+1,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, StateQuality.ACTION,(player+1)%0,[self])
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins+1,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, StateQuality.ACTION,(player+1)%2,[self])
             else:
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins+1,curr_state.turn_counter, StateQuality.ACTION,(player+1)%0,[self])
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins+1,curr_state.turn_counter, StateQuality.ACTION,(player+1)%2,[self])
 
     class ForeignAidMove:
         def __init__(self):
@@ -232,9 +281,9 @@ class TwoSimpCoup:
             player = curr_state.curr_player
             history.append((self,player))
             if player == 0:
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins+2,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, StateQuality.COUNTER,(player+1)%0,[self])
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins+2,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, StateQuality.COUNTER,(player+1)%2,[self])
             else:
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins+2,curr_state.turn_counter, StateQuality.COUNTER,(player+1)%0,[self]) 
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins+2,curr_state.turn_counter, StateQuality.COUNTER,(player+1)%2,[self]) 
 
     class CoupMove:
         def __init__(self):
@@ -250,13 +299,9 @@ class TwoSimpCoup:
             player = curr_state.curr_player
             history.append((self,player))
             if player == 0:
-                newcards = self.p2.choose_card_to_lose(curr_state)
-                self.p2.cards = newcards
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins-7,curr_state.p2cards-1,curr_state.p2coins,curr_state.turn_counter, StateQuality.ACTION,(player+1)%0,[self])
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins-7,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, StateQuality.LOSINGCARD,(player+1)%2,[self])
             else:
-                newcards = self.p1.choose_card_to_lose(curr_state)
-                self.p1.cards = newcards 
-                return PublicState(bin_encoder(history),curr_state.p1cards-1,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins-7,curr_state.turn_counter, StateQuality.ACTION,(player+1)%0,[self]) 
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins-7,curr_state.turn_counter, StateQuality.LOSINGCARD,(player+1)%2,[self]) 
     
     class CounterForeignAidMove:
         def __init__(self):
@@ -269,9 +314,9 @@ class TwoSimpCoup:
             history.append((self,player))
             curr_state.movestack.append(self)
             if player == 0:
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins-2,curr_state.turn_counter, curr_state.next_quality(),(player+1)%0,curr_state.movestack)
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins-2,curr_state.turn_counter, curr_state.next_quality(),(player+1)%2,curr_state.movestack)
             else: 
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins-2,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, curr_state.next_quality(),(player+1)%0,curr_state.movestack)  
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins-2,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, curr_state.next_quality(),(player+1)%2,curr_state.movestack)  
 
     class CounterStealMove:
         def __init__(self):
@@ -284,9 +329,9 @@ class TwoSimpCoup:
             history.append((self,player))
             curr_state.movestack.append(self)
             if player == 0:
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins+2,curr_state.p2cards,curr_state.p2coins-2,curr_state.turn_counter, curr_state.next_quality(),(player+1)%0,curr_state.movestack)
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins+2,curr_state.p2cards,curr_state.p2coins-2,curr_state.turn_counter, curr_state.next_quality(),(player+1)%2,curr_state.movestack)
             else: 
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins-2,curr_state.p2cards,curr_state.p2coins+2,curr_state.turn_counter, curr_state.next_quality(),(player+1)%0,curr_state.movestack)  
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins-2,curr_state.p2cards,curr_state.p2coins+2,curr_state.turn_counter, curr_state.next_quality(),(player+1)%2,curr_state.movestack)  
   
 
     class CounterAssassinMove:
@@ -300,9 +345,9 @@ class TwoSimpCoup:
             history.append((self,player))
             curr_state.movestack.append(self)
             if player == 0:
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins ,curr_state.turn_counter, curr_state.next_quality(),(player+1)%0,curr_state.movestack)
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins ,curr_state.turn_counter, curr_state.next_quality(),(player+1)%2,curr_state.movestack)
             else: 
-                return PublicState(bin_encoder(history),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, curr_state.next_quality(),(player+1)%0,curr_state.movestack)  
+                return PublicState(bin_encoder(),curr_state.p1cards,curr_state.p1coins,curr_state.p2cards,curr_state.p2coins,curr_state.turn_counter, curr_state.next_quality(),(player+1)%2,curr_state.movestack)  
   
 
     class ChallengeMove:
@@ -312,7 +357,7 @@ class TwoSimpCoup:
         def assign_players(self,p1obj,p2obj):
             self.p1 = p1obj 
             self.p2 = p2obj
-        def execute(self,curr_state):
+        def execute(self,curr_state,bin_encoder,history):
             last_action = curr_state.movestack.pop() 
             card_challenge = self.associations[last_action.index]
             curr_state.movestack.append(self)
@@ -333,19 +378,33 @@ class TwoSimpCoup:
         def __init__(self):
             self.index = 11 
 
-        def execute(self,curr_state):
+        def execute(self,curr_state,bin_encoder,history):
             next_counter = curr_state.turn_counter
             next_player = curr_state.curr_player
             curr_state.movestack.append(self)
             if curr_state.next_quality() == StateQuality.ACTION:
                 next_counter += 1
                 next_player = (next_player + 1)%2
+
+            #allowing at some point in the assasination route
+            if curr_state.movestack[0].index == 5:
+                last_move = curr_state.movestack[len(curr_state.movestack)-1]
+                if last_move.index == 9:
+                    #last move was a contessa, and allowing contessa to block: no changes 
+                    return PublicState(curr_state.bins, curr_state.p1cards, curr_state.p1coins, curr_state.p2cards, curr_state.p2coins,next_counter,curr_state.next_quality(),next_player,curr_state.movestack)
+                elif last_move.index == 11:
+                    #last move was an opportunity to block with contessa but chose to let assassin go through: advance to LOSINGCARD
+                    return PublicState(curr_state.bins, curr_state.p1cards, curr_state.p1coins, curr_state.p2cards, curr_state.p2coins,next_counter,StateQuality.LOSINGCARD,next_player,curr_state.movestack)
             
             return PublicState(curr_state.bins, curr_state.p1cards, curr_state.p1coins, curr_state.p2cards, curr_state.p2coins,next_counter,curr_state.next_quality(),next_player,curr_state.movestack)
+
+            
+            
 
     
 class PublicState:
     #contains info about history bins, number of cards on the table, number of coins, and current turn
+
     def __init__(self, bins, p1cards, p1coins, p2cards, p2coins, turn_counter, state_class, curr_player, movestack):
         self.bins = bins
         self.p1cards = p1cards 
@@ -357,7 +416,7 @@ class PublicState:
         self.movestack = movestack
         self.curr_player = curr_player
 
-    def is_terminal(self,state):
+    def is_terminal(self):
         """returns -1 if not terminal, 0 if p1 wins, 1 if p2 wins"""
         if self.p1cards == 0:
             return 1
@@ -372,9 +431,24 @@ class PublicState:
             before an applicable counteraction (2), open to challenge after a counteraction (3)"""
         return (self.state_class + 1) % 4
 
+    def encode_action(self,  action):
+        """One-hot encoding of an action"""
+        return (0 if i != action.index-1 else 1 for i in range(12))
+
     def encode(self):
-        """returns all information in the public state, encoded"""
-        pass 
+        """returns all relevant information in the public state, encoded in a list of length 24"""
+        encoded = list(self.bins[0]) #4 
+        encoded.extend(list(self.bins[1])) #4
+        if len(self.movestack) < 3:
+            last_move = self.movestack[0].index 
+        else:
+            last_move = self.movestack[len(self.movestack)-1].index
+        encoded.extend([self.p1cards,self.p1coins,self.p2cards,self.p2coins,self.state_class]) #5
+        encoded.extend(list(self.encode_action(last_move))) #11
+        return encoded
+
+    
+
 
 
 
