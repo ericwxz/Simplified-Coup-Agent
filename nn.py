@@ -10,7 +10,7 @@ from TwoPlayerCoup import StateQuality, PublicState
 import numpy as np
 
 import keras
-from keras.models import Sequential
+from keras.models import Sequential 
 from keras.layers import Dense, Dropout
 from keras.optimizers import SGD
 

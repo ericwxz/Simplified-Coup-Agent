@@ -44,7 +44,7 @@ class TwoSimpCoup:
 
     def encode_bins(self):
         if len(self.history) < 3:
-            return ((0,0,0,0),(0,0,0,0))
+            return ((0.5,0.5,0.5,0.5),(0.5,0.5,0.5,0.5))
         p1_bins = [0 for i in range(self.num_cards)]
         p2_bins = [0 for i in range (self.num_cards)]
         for action_player in self.history:
@@ -136,7 +136,7 @@ class TwoSimpCoup:
         p2deck.append(deck.pop(random.randrange(len(deck))))
         self.p1.get_cards(p1deck)
         self.p2.get_cards(p2deck)
-        start_state = PublicState([],2,2,2,2,0,StateQuality.ACTION, 0, [])
+        start_state = PublicState(((0.5,0.5,0.5,0.5),(0.5,0.5,0.5,0.5)),2,2,2,2,0,StateQuality.ACTION, 0, [])
         self.curr_state = start_state
         ret_vals = [start_state] #public state, p1state, p2state
         ret_vals.append([self.encode_card(p1deck[0]),self.encode_card(p1deck[1])])
@@ -433,13 +433,16 @@ class PublicState:
 
     def encode_action(self,  action):
         """One-hot encoding of an action"""
-        return (0 if i != action.index-1 else 1 for i in range(12))
+        return (0 if i != action-1 else 1 for i in range(12))
 
     def encode(self):
         """returns all relevant information in the public state, encoded in a list of length 24"""
+        print(self.bins)
         encoded = list(self.bins[0]) #4 
         encoded.extend(list(self.bins[1])) #4
-        if len(self.movestack) < 3:
+        if len(self.movestack) == 0:
+            last_move = -1
+        elif len(self.movestack) < 3:
             last_move = self.movestack[0].index 
         else:
             last_move = self.movestack[len(self.movestack)-1].index
