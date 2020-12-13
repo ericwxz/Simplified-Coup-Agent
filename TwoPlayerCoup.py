@@ -42,9 +42,17 @@ class TwoSimpCoup:
     def encode_action(self,  action):
         """One-hot encoding of an action"""
         return (0 if i != action.index-1 else 1 for i in range(len(self.combined_playbook)))
+    
+    def decode_action(self, encoded_action):
+        action_index = -1
+        for i in range(len(encoded_action)):
+            if encoded_action[i] != 0:
+                action_index = i +1
+        return action_index 
 
     def encode_card(self, card_index):
         return (0 if i != card_index else 1 for i in range(self.num_cards))
+
 
     def encode_hand(self, player):
         if player == 0:
@@ -57,6 +65,25 @@ class TwoSimpCoup:
             dead = [1 if i in self.p2deadcards else 0 for i in range(self.num_cards)]
             ret.append(dead )
             return ret
+    
+    def decode_hand(self, encoded):
+        alive_encoded_cards = encoded[:self.num_cards]
+        dead_encoded_cards = encoded[self.num_cards:]
+        alive_cards = []
+        dead_cards = []
+        for i in range(self.num_cards):
+            if alive_encoded_cards[i] == 1:
+                alive_cards.append(i)
+            if dead_encoded_cards[i] == 1:
+                dead_cards.append(i)
+        
+        if len(alive_cards) == 1 and len(dead_cards) == 0:
+            alive_cards.append(alive_cards[0])
+        
+        if len(alive_cards) == 0 and len(dead_cards) == 1:
+            dead_cards.append(dead_cards[0])
+        
+        return (tuple(alive_cards), tuple(dead_cards))
 
     def encode_bins(self):
         if len(self.history) < 3:
@@ -101,6 +128,30 @@ class TwoSimpCoup:
         encoded = self.encode_hand(state.curr_player)
         encoded.extend(state.encode())
         return encoded
+
+    def bin_encoded_state(self, encoded_full_state):
+        return encoded_full_state[:12]
+
+    def decode_public_state(self, full_encoded, player):
+        #first 8 make up private hand state
+        encoded = full_encoded[8:]
+
+        bins = (tuple(encoded[0:4]),tuple(encoded[4:8]))
+        p1cards = encoded[8]
+        p1coins = encoded[9]
+        p2cards = encoded[10]
+        p2coins = encoded[11]
+        state_class = encoded[12]
+        encoded_last_action = encoded[13:13+len(self.combined_playbook)]
+        last_action_player = encoded[13+len(self.combined_playbook)]
+
+        return PublicState(bins, p1cards,p1coins,p2cards,p2coins,0,state_class,player,[(self.decode_action(encoded_last_action),last_action_player)])
+
+
+    def decode_private_state(self, full_encoded):
+        encoded= full_encoded[:8]
+        return self.decode_hand(encoded)
+
 
 
     def valid_moves(self, state):
@@ -473,6 +524,8 @@ class TwoSimpCoup:
                     
             return PublicState(bin_encoder(history), p1cards, curr_state.p1coins, p2cards,curr_state.p2coins,curr_state.turn_counter+1,StateQuality.ACTION, next_player, [])
     
+
+
 class PublicState:
     #contains info about history bins, number of cards on the table, number of coins, and current turn
 
@@ -514,26 +567,14 @@ class PublicState:
         if len(self.movestack) == 0:
             last_move = -1
         elif len(self.movestack) < 3:
-            last_move = self.movestack[0].index 
+            last_move = self.movestack[0] 
         else:
-            last_move = self.movestack[len(self.movestack)-1].index
+            last_move = self.movestack[len(self.movestack)-1]
         encoded.extend([self.p1cards,self.p1coins,self.p2cards,self.p2coins,self.state_class]) #5
-        encoded.extend(list(self.encode_action(last_move))) #11
+        encoded.extend(list(self.encode_action(last_move[0]))) #13
+        encoded.append(last_move[1]) #1
         return encoded
 
-    
 
-
-
-
-
-
-
-    
-
-    
-        
-
-        
     
     

@@ -1,15 +1,18 @@
 from TwoPlayerCoup import PublicState,TwoSimpCoup
 from Player import PolicyPlayer,RandomPlayer
 from OptimalPolicy import optimal_policy
-from nn import ANNPolicy
+from qcoup import BasicQPolicy
 def __main__():
     game = TwoSimpCoup()
-    nnp = ANNPolicy(game)
-    nnp.train(100)
-    nnp.save("model")
-    nnpolicy = nnp.get_policy()
+    
+    qbuilder = BasicQPolicy(game)
+    qpolicy = qbuilder.q_learn(1000000)
+    qbuilder.save_table()
+    
 
-    p1= PolicyPlayer(game,0,nnpolicy)
+
+
+    p1= PolicyPlayer(game,0,qpolicy)
     p2= PolicyPlayer(game,1,optimal_policy)
     p1wins = 0.0
     for i in range(100):
