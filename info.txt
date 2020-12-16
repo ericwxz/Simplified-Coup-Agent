@@ -1,0 +1,37 @@
+Eric Zhang, CS 474
+Two-Player Simplified Coup with Q-learning
+------------------------------------------
+
+The Coup game is not only an imperfect-information game,  but it is
+one with a variable number of valid actions for a given state. The 
+game can be modeled as a state machine, with opportunities to challenge
+actions and counter actions and then challenge those counters. Modeling the 
+imperfect-information possibilities while retaining the unique challenge
+mechanic for the agent was an interesting problem-- the current model encodes 
+the public state (number of cards in play for each player, number of coins 
+for each player, etc) and prepends rough "certainty bins" that correspond to 
+0=unlikely, 1=very likely, 0.5=unsure for each card based on the history 
+of moves made up to that point. Thus we preserve the "reasoning" and imperfect 
+knowledge aspects of the game in the public state given to the agent-- However, 
+implementing a model for the game was difficult, especially in coming up with a 
+robust OOP solution that could manage both the private state and the public state 
+in repeated play. 
+
+Even with these simplifications and the super-simplified bins, the state space 
+is large enough that the q-learning training has a modified "playout" scheme to
+allow treating the opponent as part of the environment. 20% of the time the "opponent"
+model makes a random move so as to explore more of the state space; the other 
+80% of the time, the "opponent" acts according to the optimal policy laid out. 
+
+Due to the highly simplified nature of the state space given to the agent, 
+the agent just has a slight edge (55%) against the optimal policy with an hour of 
+training and slightly-optimized learning rates and epsilon values. It does a little 
+better against the random player-- about 60%-- but this stil counts as a success, 
+as in real play between human players, should one of the players unknowingly 
+adopt a random strategy from the start, the other player does not really 
+gain a clear advantage. 
+
+The agent might be further optimized by tweaking the learning rate even more, 
+training against more games (currently training in the 13000 range), and 
+further specifying and tuning the certainty bins to be more representative 
+of what might come up in real play. 

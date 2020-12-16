@@ -72,17 +72,17 @@ def optimal_policy(game_state, cards, player, is_lose):
         #else, if 
     elif game_state.state_class == StateQuality.COUNTER:
         last_move = game_state.movestack[len(game_state.movestack)-1]
-        if last_move.index == 6:
+        if last_move[0] == 6:
             if 2 in cards or game_state.bins[player][2] > 0.4:
                 return 8
             else:
                 return 11 
-        if last_move.index == 2:
+        if last_move[0] == 2:
             if 0 in cards or game_state.bins[player][0] > 0.4:
                 return 7
             else:
                 return 11 
-        if last_move.index == 5:
+        if last_move[0] == 5:
             if 3 in cards or game_state.bins[player][3] > 0.9:
                 return 9
             elif game_state.bins[player][3] > 0.4 and num_cards == 1: 
@@ -99,7 +99,7 @@ def optimal_policy(game_state, cards, player, is_lose):
         if len(game_state.movestack) == 0:
             return 11
         last_move = game_state.movestack[len(game_state.movestack)-1]
-        if last_move.index ==5:
+        if last_move[0] ==5:
             if len(cards) == 1 and 3 not in cards:
                 return 10 
             else: 
@@ -109,23 +109,35 @@ def optimal_policy(game_state, cards, player, is_lose):
             for i in game_state.bins[(player+1)%2]:
                 if i > 0.9:
                     num_certain_cards +=1
-            if associations[last_move.index] == None:
+            if associations[last_move[0]] == None:
                 return 11
-            if game_state.bins[(player+1)%2][associations[last_move.index]] == 0 and 3 >= num_certain_cards > 1:
+            if game_state.bins[(player+1)%2][associations[last_move[0]]] == 0 and 3 >= num_certain_cards > 1:
                 return 10 
             else: 
                 return 11
     else: 
         if game_state.bins[(player + 1)%2][1] < 0.5 and 3 in cards:
-            return cards.index(3)
+            if cards.index(3) == 0:
+                return 12
+            else:
+                return 13
         elif 2 in cards:
-            return cards.index(2) 
+            if cards.index(2) == 0:
+                return 12
+            else:
+                return 13
         elif 3 in cards: 
-            return cards.index(3)
+            if cards.index(3) == 0:
+                return 12
+            else:
+                return 13
         elif 1 in cards:
-            return cards.index(1) 
+            if cards.index(1) == 0:
+                return 12
+            else:
+                return 13 
         else:
             if len(cards) == 1:
-                return 0
-            return cards.index(0)
+                return 12
+            return 12
     
